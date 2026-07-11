@@ -1,0 +1,14 @@
+{
+  "name": "mbs-radio-webapp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MBS Radio player, show archive and admin interface",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "express": "^4.21.2"
+  }
+}

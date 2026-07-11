@@ -1,0 +1,51 @@
+services:
+  icecast:
+    build: ./icecast
+    container_name: icecast
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    environment:
+      - ICECAST_SOURCE_PASSWORD=${ICECAST_SOURCE_PASSWORD:?set ICECAST_SOURCE_PASSWORD in .env}
+      - ICECAST_RELAY_PASSWORD=${ICECAST_RELAY_PASSWORD:?set ICECAST_RELAY_PASSWORD in .env}
+      - ICECAST_ADMIN_PASSWORD=${ICECAST_ADMIN_PASSWORD:?set ICECAST_ADMIN_PASSWORD in .env}
+    volumes:
+      - ./icecast/icecast.xml:/etc/icecast2/icecast.xml.tpl:ro
+      - ./icecast/web/player.html:/usr/share/icecast2/web/player.html:ro
+
+  liquidsoap:
+    image: savonet/liquidsoap:v2.4.5
+    container_name: liquidsoap
+    restart: unless-stopped
+    user: "10000:10001"
+    depends_on:
+      - icecast
+    entrypoint: ["liquidsoap"]
+    command: ["/radio.liq"]
+    environment:
+      # radio.liq reads these: source password to publish to icecast,
+      # harbor password for DJs connecting from Mixxx
+      - ICECAST_SOURCE_PASSWORD=${ICECAST_SOURCE_PASSWORD:?set ICECAST_SOURCE_PASSWORD in .env}
+      - HARBOR_PASSWORD=${HARBOR_PASSWORD:?set HARBOR_PASSWORD in .env}
+      - HOME=/tmp
+    ports:
+      - "9000:9000" # PUSH audio here
+    volumes:
+      - ./liquidsoap/radio.liq:/radio.liq:ro
+      - ./music:/music:ro        # off-air loop clips
+      - ./recordings:/recordings # recorded live shows
+
+  webapp:
+    build: ./webapp
+    container_name: mbs-webapp
+    restart: unless-stopped
+    depends_on:
+      - icecast
+    user: "10000:10001" # liquidsoap uid
+    ports:
+      - "8010:8010" # player webui + /manage admin UI
+    environment:
+      - ADMIN_PASSWORD=${WEBAPP_ADMIN_PASSWORD:?set WEBAPP_ADMIN_PASSWORD in .env}
+    volumes:
+      - ./webapp/public:/app/public:ro
+      - ./recordings:/recordings

@@ -1,0 +1,51 @@
+/* MBS Radio shared styles — loaded after pico.min.css on every page. */
+
+[data-theme=dark] {
+  --pico-background-color: #000000;
+  --pico-card-background-color: #1e1e1e;
+}
+
+/* ---- shared ---- */
+h1, footer, .center { text-align: center }
+.badge { font-size: .7rem; font-weight: 700; letter-spacing: .08em; padding: .2rem .6rem;
+         border-radius: 999px; background: var(--pico-secondary-background); color: #fff }
+.badge.on { background: #46a758 }
+.badge.warn { background: #ad5700 }
+.badge.live, .badge.rec { background: #e5484d; animation: pulse 1.6s infinite }
+@keyframes pulse { 50% { opacity: .55 } }
+.footer-logos { display: flex; justify-content: center; align-items: center; gap: 1.5rem; flex-wrap: wrap }
+.footer-logos img { height: 2.2rem; width: auto }
+
+/* ---- player ---- */
+body > main { max-width: 42rem; margin: auto }
+audio { width: 100% }
+#shows { padding: 0 }
+#shows li { display: flex; gap: .75rem; align-items: center; list-style: none }
+#shows li > div { flex: 1; min-width: 0 }
+#shows b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+#shows button { width: 2.4rem; padding: .3rem; border-radius: 50% }
+#shows a { text-decoration: none; font-size: 1.2rem }
+
+/* ---- live now + upcoming shows (player) ---- */
+:is(#upcoming, #live-now) { padding: 0; margin: 0 }
+:is(#upcoming, #live-now) li { list-style: none; padding: .6rem 0 }
+:is(#upcoming, #live-now) li + li { border-top: 1px solid var(--pico-muted-border-color) }
+:is(#upcoming, #live-now) b { margin-right: .5rem }
+:is(#upcoming, #live-now) p { margin: 0; color: var(--pico-muted-color); font-size: .9rem }
+
+/* ---- manage ---- */
+#app main { max-width: 60rem; margin: auto }
+#app #login { max-width: 24rem; margin: 15vh auto 0 }
+.row { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap }
+td, th { vertical-align: middle }
+td :is(button, input), .row :is(button, [role=button], input) { width: auto; margin: 0; padding: .25rem .6rem; font-size: .85rem }
+.actions { white-space: nowrap; text-align: right }
+.actions > * { margin-left: .3rem }
+.danger { border-color: #e5484d; color: #ff8b8e }
+.hidden-row { opacity: .45 }
+.show-form { display: grid; grid-template-columns: 1.4fr 1fr; gap: .6rem; margin-bottom: 1.2rem }
+.show-form :is(input, button) { margin: 0 }
+@media (max-width: 36rem) { .show-form { grid-template-columns: 1fr } }
+.toast { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%);
+         background: var(--pico-card-background-color); border: 1px solid var(--pico-muted-border-color);
+         padding: .5rem 1rem; border-radius: 8px }

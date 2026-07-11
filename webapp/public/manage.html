@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MBS Radio Management Console</title>
+<link rel="stylesheet" href="/pico.min.css">
+<link rel="stylesheet" href="/theme.css">
+<script src="/footer.js" defer></script>
+</head>
+<body>
+<div id="app"></div>
+
+<mbs-footer></mbs-footer>
+
+<script type="module">
+import { html, render, useState, useEffect } from
+  "https://cdn.jsdelivr.net/npm/htm@3.1.1/preact/standalone.module.js";
+
+async function api(method, url, body) {
+  const r = await fetch(url, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : {},
+    body: body && JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (r.status === 401) throw Object.assign(new Error("logged out"), { auth: true });
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error || "error " + r.status);
+  return d;
+}
+
+const fmtDate = iso => new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+const pad = n => String(n).padStart(2, "0");
+const fmtDur = s => (s >= 3600 ? (s / 3600 | 0) + ":" + pad(s / 60 % 60 | 0) : s / 60 | 0) + ":" + pad(s % 60);
+const Badge = ({ cls, text }) => html`<span class="badge ${cls || ""}">${text}</span>`;
+
+function IcecastStats({ ic }) {
+  if (!ic) return html`<div style="margin-top:.8rem"><small>Icecast stats unavailable</small></div>`;
+  const total = ic.mounts.reduce((n, m) => n + m.listeners, 0);
+  return html`
+    <div style="margin-top:.8rem">
+      <div style="margin-bottom:.4rem"><${Badge} text=${total + (total === 1 ? " LISTENER" : " LISTENERS")} /></div>
+      ${ic.mounts.map(m => html`<div key=${m.mount}><small>
+        /${m.mount}: ${m.listeners} now · peak ${m.peak}${m.bitrate ? ` · ${m.bitrate} kbps` : ""}${m.type ? ` · ${m.type}` : ""}
+      </small></div>`)}
+      ${ic.serverStart && html`<div><small>server up since ${fmtDate(ic.serverStart)}</small></div>`}
+    </div>`;
+}
+
+function Status({ st }) {
+  const anyLive = st.live.primary || st.live.guest;
+  return html`
+    <article>
+      <h6>Status</h6>        
+      <div class="row">
+        <${Badge} cls=${st.live.primary && "on"} text=${"PRIMARY " + (st.live.primary ? "LIVE" : "off")} />
+        <${Badge} cls=${st.live.guest && "on"} text=${"GUEST " + (st.live.guest ? "LIVE" : "off")} />
+        ${st.inProgress.length && anyLive ? html`<${Badge} cls="rec" text="● RECORDING" />`
+          : anyLive && st.pause.paused ? html`<${Badge} cls="warn" text="LIVE, NOT RECORDING" />` : null}
+      </div>
+      <${IcecastStats} ic=${st.icecast} />
+      <div class="row" style="margin-top:.8rem">
+        <a href="/status.xsl" role="button">Icecast 2 Status Page</a>
+        <a href="/admin/" role="button">Icecast 2 Admin Page</a>
+      </div>
+    </article>`;
+}
+
+function Pause({ pause, act }) {
+  const set = paused => act(api("POST", "/api/admin/pause", { paused }),
+    paused ? "Recording paused" : "Recording resumed");
+  return html`
+    <article><h6>Automatic Recording</h6>
+      <p>When recording is disabled, live shows will not be saved.</p>
+      <div class="row">
+        <${Badge} cls=${pause.paused ? "warn" : "on"}
+                  text=${pause.paused ? "AUTO RECORDING DISABLED" : "AUTO RECORDING ENABLED"} />
+      </div>
+      <div class="row" style="margin-top:.8rem">
+        ${pause.paused
+          ? html`<button onClick=${() => set(false)}>Resume recording</button>`
+          : html`<button class="danger outline" onClick=${() => set(true)}>Pause recording</button>`}
+      </div>
+    </article>`;
+}
+function LiveNow({ ln, act }) {
+  const [draft, setDraft] = useState({ name: ln.name, description: ln.description });
+  const edit = e => setDraft({ ...draft, [e.target.name]: e.target.value });
+  return html`
+    <article>
+      <h6>Live Now</h6>
+      <p>While on, the player page shows this as the currently airing program. Turn off when the show ends.</p>
+      <div class="row">
+        ${ln.active
+          ? html`<button class="outline" onClick=${() => act(api("PUT", "/api/admin/live-now", { active: false }), "Live Now off")}>Turn off</button>`
+          : html`<button onClick=${() => act(api("PUT", "/api/admin/live-now", { active: true }), "Live Now on")}>Turn on</button>`}
+      </div>
+      <div class="row" style="margin-top:.8rem">
+        <input style="flex:1" name="name" value=${draft.name} placeholder="Program name" onInput=${edit} />
+        <input style="flex:2" name="description" value=${draft.description} placeholder="Description (optional)" onInput=${edit} />
+        <button onClick=${() => act(api("PUT", "/api/admin/live-now", draft), "Live Now saved")}>Save</button>
+      </div>
+    </article>`;
+}
+
+// ISO <-> the browser-local "YYYY-MM-DDTHH:mm" format datetime-local inputs use
+const toLocalInput = iso => {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+const toIso = local => new Date(local).toISOString();
+
+function ShowRow({ s, draft, edit, act }) {
+  return html`
+    <tr class=${s.date < new Date().toISOString() ? "hidden-row" : ""}>
+      <td><input name="name" value=${draft.name} onInput=${e => edit(s, e)} /></td>
+      <td><input type="datetime-local" name="date" value=${draft.date} onInput=${e => edit(s, e)} /></td>
+      <td><input name="description" value=${draft.description} placeholder="Description" onInput=${e => edit(s, e)} /></td>
+      <td class="actions">
+        <button class="danger outline" onClick=${() =>
+          confirm("Delete this show?\n\n" + s.name) && act(api("DELETE", "/api/admin/shows/" + s.id), "Deleted")}>delete</button>
+      </td>
+    </tr>`;
+}
+
+function Shows({ shows, act }) {
+  const [drafts, setDrafts] = useState({});
+  const draftOf = s => drafts[s.id] || { name: s.name, date: toLocalInput(s.date), description: s.description };
+  const edit = (s, e) => setDrafts({ ...drafts, [s.id]: { ...draftOf(s), [e.target.name]: e.target.value } });
+  const dirty = shows.filter(s => {
+    const d = drafts[s.id];
+    return d && (d.name !== s.name || d.description !== s.description || d.date !== toLocalInput(s.date));
+  });
+  const saveAll = () => act(Promise.all(dirty.map(s => {
+    const d = drafts[s.id];
+    return api("PATCH", "/api/admin/shows/" + s.id,
+      { name: d.name, description: d.description, ...(d.date && { date: toIso(d.date) }) });
+  })), "Shows saved");
+
+  const submit = e => {
+    e.preventDefault();
+    const f = e.target.elements;
+    act(api("POST", "/api/admin/shows", {
+      name: f.name.value, date: toIso(f.date.value), description: f.description.value,
+    }).then(() => e.target.reset()), "Show added");
+  };
+  return html`
+    <article>
+      <h6>Upcoming Live Shows</h6>
+      <form class="show-form" onSubmit=${submit}>
+        <input name="name" placeholder="Show name" required maxlength="200" />
+        <input type="datetime-local" name="date" required />
+        <input name="description" placeholder="Description (optional)" maxlength="1000" />
+        <button type="submit">Add show</button>
+      </form>
+      ${shows.length ? html`
+        <div style="overflow-x:auto"><table>
+          <thead><tr><th style="width:30%">Name</th><th>Date</th><th style="width:35%">Description</th><th /></tr></thead>
+          <tbody>${shows.map(s => html`<${ShowRow} key=${s.id} s=${s} draft=${draftOf(s)} edit=${edit} act=${act} />`)}</tbody>
+        </table></div>
+        <div class="row" style="margin-top:.6rem">
+          <button onClick=${saveAll} disabled=${!dirty.length}>Save changes</button>
+        </div>` : html`<small>No shows scheduled.</small>`}
+    </article>`;
+}
+
+function Row({ r, title, edit, act }) {
+  const url = "/api/admin/recordings/" + encodeURIComponent(r.id);
+  return html`
+    <tr class=${r.hidden ? "hidden-row" : ""}>
+      <td><input value=${title} placeholder=${"Broadcast - " + fmtDate(r.date)}
+        onInput=${e => edit(e.target.value)} /></td>
+      <td>${fmtDate(r.date)}</td><td>${fmtDur(r.duration)}</td>
+      <td>${(r.size / 1048576).toFixed(1)} MB</td>
+      <td class="actions">
+        <a href=${r.url + "?download"}>download</a>
+        <button class="outline" onClick=${() => act(api("PATCH", url, { hidden: !r.hidden }))}>
+          ${r.hidden ? "unhide" : "hide"}</button>
+        <button class="danger outline" onClick=${() =>
+          confirm("Permanently delete this recording?\n\n" + (r.title || r.id)) &&
+          act(api("DELETE", url), "Deleted")}>delete</button>
+      </td>
+    </tr>`;
+}
+
+function Recordings({ recordings, act }) {
+  const [drafts, setDrafts] = useState({}); // id -> edited title
+  const dirty = recordings.filter(r => drafts[r.id] !== undefined && drafts[r.id] !== r.title);
+  const saveAll = () => act(Promise.all(dirty.map(r =>
+    api("PATCH", "/api/admin/recordings/" + encodeURIComponent(r.id), { title: drafts[r.id] }))), "Titles saved");
+  return html`
+    <article>
+      <h6>Recordings</h6>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th style="width:45%">Title</th><th>Date</th><th>Length</th><th>Size</th><th /></tr></thead>
+        <tbody>
+          ${recordings.length
+            ? recordings.map(r => html`<${Row} key=${r.id} r=${r} title=${drafts[r.id] ?? r.title}
+                edit=${v => setDrafts({ ...drafts, [r.id]: v })} act=${act} />`)
+            : html`<tr><td colspan="5"><small>No recordings yet.</small></td></tr>`}
+        </tbody>
+      </table></div>
+      ${recordings.length ? html`<div class="row" style="margin-top:.6rem">
+        <button onClick=${saveAll} disabled=${!dirty.length}>Save changes</button>
+      </div>` : null}
+    </article>`;
+}
+
+function Admin({ onLogout }) {
+  const [st, setSt] = useState(null);
+  const [msg, setMsg] = useState("");
+
+  const refresh = () => api("GET", "/api/admin/state").then(setSt).catch(e => e.auth && onLogout());
+  useEffect(() => { refresh(); }, []);
+
+  const toast = m => { setMsg(m); setTimeout(() => setMsg(""), 2500); };
+  // run request -> toast success, refresh state, surface errors
+  const act = (p, ok) => p
+    .then(() => { ok && toast(ok); refresh(); })
+    .catch(e => e.auth ? onLogout() : toast(e.message));
+
+  if (!st) return null;
+  return html`
+    <main>
+      <nav>
+        <ul><li><strong>MBS Radio Management Console</strong></li></ul>
+        <ul><li><a href="/">← player</a></li>
+          <li><a href="#" onClick=${e => { e.preventDefault(); api("POST", "/api/logout").then(onLogout, onLogout); }}>log out</a></li></ul>
+      </nav>
+      <${Status} st=${st} />
+      <${Pause} pause=${st.pause} act=${act} />
+      ${st.liveNow && html`<${LiveNow} ln=${st.liveNow} act=${act} />`}
+      <${Shows} shows=${st.shows} act=${act} />
+      <${Recordings} recordings=${st.recordings} act=${act} />
+      ${msg && html`<div class="toast">${msg}</div>`}
+    </main>`;
+}
+
+function Login({ onLogin }) {
+  const [err, setErr] = useState("");
+  const submit = e => {
+    e.preventDefault();
+    api("POST", "/api/login", { password: e.target.password.value })
+      .then(onLogin).catch(ex => setErr(ex.message));
+  };
+  return html`
+    <main id="login">
+      <h3 style="text-align:center">MBS Radio Management Console</h3>
+      <article><form onSubmit=${submit}>
+        <input type="password" name="password" placeholder="Admin password"
+               autocomplete="current-password" autofocus />
+        <button type="submit" style="width:100%">Log in</button>
+        <small style="color:#ff8b8e">${err}</small>
+      </form></article>
+    </main>`;
+}
+
+function App() {
+  const [view, setView] = useState("loading");
+  useEffect(() => {
+    api("GET", "/api/admin/state").then(() => setView("admin"), () => setView("login"));
+  }, []);
+  return view === "loading" ? null
+    : view === "admin" ? html`<${Admin} onLogout=${() => setView("login")} />`
+    : html`<${Login} onLogin=${() => setView("admin")} />`;
+}
+
+render(html`<${App} />`, document.getElementById("app"));
+</script>
+</body>
+</html>

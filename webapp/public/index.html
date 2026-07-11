@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MBS Radio</title>
+<meta name="description" content="MBS Radio on the web for free background listening.">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="MBS Radio">
+<meta property="og:title" content="MBS Radio">
+<meta property="og:description" content="MBS Radio on the web for free background listening.">
+<meta property="og:url" content="https://radio.felineholdings.com/">
+<meta property="og:image" content="https://radio.felineholdings.com/MBS_Radio_White_On_Black.png">
+<meta property="og:image:width" content="1136">
+<meta property="og:image:height" content="233">
+
+<meta property="og:image:alt" content="MBS Radio logo">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="MBS Radio">
+<meta name="twitter:description" content="MBS Radio on the web for free background listening.">
+<meta name="twitter:image" content="https://radio.felineholdings.com/MBS_Radio_White_On_Black.png">
+
+<link rel="stylesheet" href="/pico.min.css">
+<link rel="stylesheet" href="/theme.css">
+<script src="/footer.js" defer></script>
+</head>
+<body>
+<main>
+  <h1><img src="/mbs_radio_logo_white-01.png" alt="MBS Radio"></h1>
+
+  <article class="center">
+    <p><span id="live-badge" class="badge">OFF AIR</span></p>
+    <p id="now-playing">Loading track info&hellip;</p>
+    <audio id="player" controls preload="none"></audio>
+  </article>
+
+  <article>
+    <h4>Live Now</h4>
+    <ul id="live-now"><li>Loading&hellip;</li></ul>
+  </article>
+
+  <article>
+    <h4>Upcoming Live Shows</h4>
+    <ul id="upcoming"><li>Loading&hellip;</li></ul>
+  </article>
+
+  <article>
+    <h4>Previous Broadcasts</h4>
+    <div id="archive-player-box" hidden>
+      <p><b id="archive-title"></b></p>
+      <audio id="archive-player" src="/stream.mp3" controls preload="none"></audio>
+      <hr>
+    </div>
+    <ul id="shows"><li>Loading&hellip;</li></ul>
+  </article>
+</main>
+
+<mbs-footer></mbs-footer>
+
+<script>
+const $ = id => document.getElementById(id);
+const player = $("player"), arch = $("archive-player");
+
+// --- Live player: unique URL per load defeats caches so we join at the live edge ---
+player.src = "/stream.mp3?_=" + Date.now();
+player.addEventListener("playing", () => {
+  const b = player.buffered, edge = b.length && b.end(b.length - 1);
+  if (edge && isFinite(edge) && edge - player.currentTime > 3) player.currentTime = edge;
+}, { once: true });
+//player.play().catch(() => { /* autoplay blocked */ });
+
+// --- Lock screen / control center cover art + title (Media Session API) ---
+let liveTitle = "MBS Radio";
+let current = player; // element the lock screen / notification controls act on
+const setMeta = title => {
+  if (!("mediaSession" in navigator)) return;
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title, artist: "MBS Radio",
+    artwork: [{ src: location.origin + "/cover.png", sizes: "1024x1024", type: "image/png" }],
+  });
+};
+player.addEventListener("play", () => { current = player; setMeta(liveTitle); });
+
+// Resuming a paused live stream would replay stale buffer; a fresh URL rejoins the live edge
+const tuneLive = () => {
+  player.src = "/stream.mp3?_=" + Date.now();
+  player.play();
+};
+
+// hook up the mediasession buttons to the current player
+if ("mediaSession" in navigator) {
+  navigator.mediaSession.setActionHandler("play", () => current === player ? tuneLive() : current.play());
+  navigator.mediaSession.setActionHandler("pause", () => current.pause());
+  navigator.mediaSession.setActionHandler("stop", () => current.pause());
+  const state = () => navigator.mediaSession.playbackState = current.paused ? "paused" : "playing";
+  for (const el of [player, arch])
+    for (const ev of ["play", "pause"]) el.addEventListener(ev, state);
+}
+
+// --- Live badge + now playing ---
+async function status() {
+  try {
+    const s = await (await fetch("/api/status", { cache: "no-store" })).json();
+    $("live-badge").className = "badge" + (s.anyLive ? " live" : "");
+    $("live-badge").textContent = s.anyLive ? "LIVE" : "OFF AIR";
+    $("now-playing").textContent = s.nowPlaying ? "Now playing: " + s.nowPlaying : "Live stream";
+    liveTitle = s.nowPlaying || "Live Stream";
+    if (!player.paused) setMeta(liveTitle); // keep lock screen title current while live plays
+  } catch { $("now-playing").textContent = "Track info unavailable"; }
+}
+status();
+setInterval(status, 5000);
+
+const fmtDate = iso => new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+
+// --- Live Now + upcoming live shows ---
+fetch("/api/shows", { cache: "no-store" }).then(r => r.json()).then(({ shows, liveNow }) => {
+  const OFF_AIR_TEXT = "We're not live right now, but you can see our upcoming live shows or listen to previous broadcasts below";
+  $("live-now").textContent = "";
+  const li = document.createElement("li");
+  if (liveNow) {
+    li.innerHTML = `<b></b><p></p>`;
+    li.querySelector("b").textContent = liveNow.name;
+    li.querySelector("p").textContent = liveNow.description;
+  } else {
+    li.textContent = OFF_AIR_TEXT;
+  }
+  $("live-now").appendChild(li);
+
+  $("upcoming").textContent = "";
+  if (!shows.length)
+    return $("upcoming").innerHTML = "<li>Nothing scheduled right now, check back soon!</li>";
+  for (const s of shows) {
+    const li = document.createElement("li");
+    li.innerHTML = `<b></b><small></small><p></p>`;
+    li.querySelector("b").textContent = s.name;
+    li.querySelector("small").textContent = fmtDate(s.date);
+    li.querySelector("p").textContent = s.description;
+    $("upcoming").appendChild(li);
+  }
+}).catch(() => {
+  $("upcoming").innerHTML = "<li>Could not load the show schedule.</li>";
+});
+
+// --- Previous broadcasts ---
+const pad = n => String(n).padStart(2, "0");
+const fmtDur = s => (s >= 3600 ? (s / 3600 | 0) + ":" + pad(s / 60 % 60 | 0) : s / 60 | 0) + ":" + pad(s % 60);
+const displayTitle = r => r.title || "Broadcast - " + fmtDate(r.date);
+
+// don't play two things at once
+arch.addEventListener("play", () => player.pause());
+arch.addEventListener("play", () => { current = arch; setMeta($("archive-title").textContent || "Previous Broadcast"); });
+player.addEventListener("play", () => arch.pause());
+
+fetch("/api/recordings", { cache: "no-store" }).then(r => r.json()).then(({ recordings }) => {
+  $("shows").textContent = "";
+  if (!recordings.length)
+    return $("shows").innerHTML = "<li>No recorded broadcasts yet, check back after the next show!</li>";
+  for (const r of recordings) {
+    const li = document.createElement("li");
+    li.innerHTML = `<button title="Play">▶</button><div><b></b>` +
+      `<small>${fmtDate(r.date)} · ${fmtDur(r.duration)} · ${(r.size / 1048576).toFixed(1)} MB</small></div>` +
+      `<a title="Download">⭳</a>`;
+    li.querySelector("b").textContent = displayTitle(r);
+    li.querySelector("a").href = r.url + "?download";
+    li.querySelector("button").onclick = () => {
+      $("archive-player-box").hidden = false;
+      $("archive-title").textContent = displayTitle(r);
+      arch.src = r.url;
+      arch.play();
+    };
+    $("shows").appendChild(li);
+  }
+}).catch(() => $("shows").innerHTML = "<li>Could not load previous broadcasts.</li>");
+</script>
+</body>
+</html>

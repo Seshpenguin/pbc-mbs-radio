@@ -1,0 +1,25 @@
+# broadcast to listeners: webapp (player/archive/admin) + icecast (streams)
+server {
+  server_name radio.felineholdings.com;
+  include /etc/nginx/conf.d/include/tls.conf;
+
+  proxy_buffering off;            # streaming: never buffer
+  proxy_set_header Host $http_host;
+  proxy_set_header X-Real-IP $remote_addr;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
+
+  # live streams + icecast status/admin go straight to icecast
+  location ~ ^/(stream\.mp3|stream\.ogg|status-json\.xsl|status\.xsl|style\.css|admin/.*)$ {
+    proxy_pass http://localhost:8001;
+    proxy_read_timeout 1h;
+    proxy_hide_header Cache-Control;
+    add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+  }
+
+  # everything else: player page, /recordings archive, /manage admin UI
+  location / {
+    proxy_pass http://localhost:8010;
+    proxy_read_timeout 10m;
+  }
+}
