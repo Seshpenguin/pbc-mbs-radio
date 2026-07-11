@@ -1,0 +1,5 @@
+.env
+.claude/
+recordings/
+webapp/node_modules/
+README-old.md
