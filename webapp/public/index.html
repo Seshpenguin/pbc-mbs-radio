@@ -32,7 +32,7 @@
   <article class="center">
     <p><span id="live-badge" class="badge">OFF AIR</span></p>
     <p id="now-playing">Loading track info&hellip;</p>
-    <audio id="player" src="/stream.mp3" controls preload="none"></audio>
+    <audio id="player" src="/stream.mp3" controls preload="auto"></audio>
   </article>
 
   <article>
@@ -49,7 +49,7 @@
     <h4>Previous Broadcasts</h4>
     <div id="archive-player-box" hidden>
       <p><b id="archive-title"></b></p>
-      <audio id="archive-player" controls preload="none"></audio>
+      <audio id="archive-player" controls preload="metadata"></audio>
       <hr>
     </div>
     <ul id="shows"><li>Loading&hellip;</li></ul>
@@ -67,7 +67,7 @@ player.src = "/stream.mp3?_=" + Date.now();
 player.addEventListener("playing", () => {
   const b = player.buffered, edge = b.length && b.end(b.length - 1);
   if (edge && isFinite(edge) && edge - player.currentTime > 3) player.currentTime = edge;
-}, { once: true });
+});
 //player.play().catch(() => { /* autoplay blocked */ });
 
 // --- Lock screen / control center cover art + title (Media Session API) ---
@@ -82,15 +82,12 @@ const setMeta = title => {
 };
 player.addEventListener("playing", () => { current = player; setMeta(liveTitle); });
 
-// Resuming a paused live stream would replay stale buffer; a fresh URL rejoins the live edge
-const tuneLive = () => {
-  player.src = "/stream.mp3?_=" + Date.now();
-  player.play();
-};
-
 // hook up the mediasession buttons to the current player
 if ("mediaSession" in navigator) {
-  navigator.mediaSession.setActionHandler("play", () => current === player ? tuneLive() : current.play());
+  setMeta(liveTitle);
+  navigator.mediaSession.playbackState = "paused";
+  
+  navigator.mediaSession.setActionHandler("play", () => current.play());
   navigator.mediaSession.setActionHandler("pause", () => current.pause());
   navigator.mediaSession.setActionHandler("stop", () => current.pause());
   const state = () => navigator.mediaSession.playbackState = current.paused ? "paused" : "playing";
