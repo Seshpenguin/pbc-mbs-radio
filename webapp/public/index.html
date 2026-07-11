@@ -32,7 +32,7 @@
   <article class="center">
     <p><span id="live-badge" class="badge">OFF AIR</span></p>
     <p id="now-playing">Loading track info&hellip;</p>
-    <audio id="player" controls preload="none"></audio>
+    <audio id="player" src="/stream.mp3" controls preload="none"></audio>
   </article>
 
   <article>
@@ -49,7 +49,7 @@
     <h4>Previous Broadcasts</h4>
     <div id="archive-player-box" hidden>
       <p><b id="archive-title"></b></p>
-      <audio id="archive-player" src="/stream.mp3" controls preload="none"></audio>
+      <audio id="archive-player" controls preload="none"></audio>
       <hr>
     </div>
     <ul id="shows"><li>Loading&hellip;</li></ul>
@@ -80,7 +80,7 @@ const setMeta = title => {
     artwork: [{ src: location.origin + "/cover.png", sizes: "1024x1024", type: "image/png" }],
   });
 };
-player.addEventListener("play", () => { current = player; setMeta(liveTitle); });
+player.addEventListener("playing", () => { current = player; setMeta(liveTitle); });
 
 // Resuming a paused live stream would replay stale buffer; a fresh URL rejoins the live edge
 const tuneLive = () => {
