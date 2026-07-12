@@ -33,6 +33,8 @@
     <p><span id="live-badge" class="badge">OFF AIR</span></p>
     <p id="now-playing">Loading track info&hellip;</p>
     <audio id="player" src="/stream.mp3" controls preload="none"></audio>
+    <hr />
+    <center><a href="/stream.mp3">Direct Stream (320kbps MP3)</a>, <a href="/stream.ogg">Direct Stream (128kbps Opus)</a></center>
   </article>
 
   <article>
@@ -67,10 +69,9 @@ const player = $("player"), arch = $("archive-player");
 // but preload none is needed on safari to not infinitly load the page.
 if (/firefox/i.test(navigator.userAgent)) player.preload = "auto";
 player.src = "/stream.mp3?_=" + Date.now();
-// Rejoin the live edge when we've fallen well behind (e.g. resumed after pause).
 player.addEventListener("playing", () => {
   const b = player.buffered, edge = b.length && b.end(b.length - 1);
-  if (edge && isFinite(edge) && edge - player.currentTime > 10) player.currentTime = edge - 3;
+  if (edge && isFinite(edge) && edge - player.currentTime > 3) player.currentTime = edge - 1;
 });
 //player.play().catch(() => { /* autoplay blocked */ });
 
