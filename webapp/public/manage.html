@@ -186,12 +186,41 @@ function Row({ r, title, edit, act }) {
 
 function Recordings({ recordings, act }) {
   const [drafts, setDrafts] = useState({}); // id -> edited title
+  const [pct, setPct] = useState(null); // upload progress %, null when idle
   const dirty = recordings.filter(r => drafts[r.id] !== undefined && drafts[r.id] !== r.title);
   const saveAll = () => act(Promise.all(dirty.map(r =>
     api("PATCH", "/api/admin/recordings/" + encodeURIComponent(r.id), { title: drafts[r.id] }))), "Titles saved");
+
+  // XHR rather than api()/fetch so we get upload progress events.
+  const upload = e => {
+    const f = e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    const name = (f.name.replace(/\.mp3$/i, "").replace(/[^A-Za-z0-9._-]+/g, "_")
+      .replace(/^[^A-Za-z0-9]+/, "") || "upload") + ".mp3";
+    setPct(0);
+    act(new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/admin/recordings/" + encodeURIComponent(name));
+      xhr.upload.onprogress = ev => setPct(Math.round(100 * ev.loaded / ev.total));
+      xhr.onload = () => {
+        if (xhr.status < 300) return resolve();
+        let msg; try { msg = JSON.parse(xhr.responseText).error; } catch {}
+        reject(Object.assign(new Error(msg || "upload failed"), { auth: xhr.status === 401 }));
+      };
+      xhr.onerror = () => reject(new Error("upload failed"));
+      xhr.send(f);
+    }).finally(() => setPct(null)), "Uploaded " + name);
+  };
   return html`
     <article>
       <h6>Recordings</h6>
+      <p>Upload a broadcast (.mp3)</p>
+      <div class="row" style="margin-bottom:.8rem">
+        <input type="file" accept=".mp3,audio/mpeg" onChange=${upload} disabled=${pct !== null} />
+        ${pct !== null && html`<${Badge} cls="on" text=${"UPLOADING " + pct + "%"} />`}
+      </div>
+      <hr />
       <div style="overflow-x:auto"><table>
         <thead><tr><th style="width:45%">Title</th><th>Date</th><th>Length</th><th>Size</th><th /></tr></thead>
         <tbody>

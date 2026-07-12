@@ -279,6 +279,23 @@ app.patch("/api/admin/recordings/:id", requireAdmin, async (req, res) => {
   res.json({ ok: true });
 });
 
+// upload recordings
+app.post("/api/admin/recordings/:id", requireAdmin, (req, res) => {
+  const id = req.params.id;
+  if (!FILE_RE.test(id)) return res.status(400).json({ error: "bad filename" });
+  const file = path.join(REC_DIR, id);
+  if (fs.existsSync(file)) return res.status(409).json({ error: "a recording with that name already exists" });
+  const tmp = file + ".upload"; // doesn't match FILE_RE, so listings never see partial uploads
+  const out = fs.createWriteStream(tmp, { flags: "wx" });
+  out.on("error", (err) => res.status(500).json({ error: "write failed: " + (err.code || err.message) }));
+  out.on("finish", () => fsp.rename(tmp, file).then(
+    () => res.json({ ok: true }),
+    () => res.status(500).json({ error: "could not save file" })));
+  out.on("close", () => { if (!out.writableFinished) fsp.rm(tmp, { force: true }); });
+  req.on("aborted", () => out.destroy());
+  req.pipe(out);
+});
+
 app.delete("/api/admin/recordings/:id", requireAdmin, async (req, res) => {
   const id = req.params.id;
   if (!FILE_RE.test(id)) return res.status(400).json({ error: "bad name" });
