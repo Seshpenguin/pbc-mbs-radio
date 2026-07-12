@@ -24,7 +24,7 @@
     </authentication>
 
     <!-- Set to your public IP or domain for correct stream URLs in the web UI -->
-    <hostname>pbc-radio-infra.sineware.ca</hostname>
+    <hostname>radio.felineholdings.com</hostname>
 
     <listen-socket>
         <port>8000</port>
@@ -50,4 +50,9 @@
     <security>
         <chroot>0</chroot>
     </security>
+
+    <directory>
+        <yp-url-timeout>15</yp-url-timeout>
+        <yp-url>http://dir.xiph.org/cgi-bin/yp-cgi</yp-url>
+    </directory>
 </icecast>
