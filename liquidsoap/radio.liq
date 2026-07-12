@@ -23,15 +23,18 @@ if harbor_password == "" then
 end
 
 # Main inputs from source
-primary = buffer(buffer=2.0, max=10.0, fallible=true,
-                 input.harbor("primary", port=9000, password=harbor_password, icy=true,
-                              on_connect=fun (_) -> set_live(primary_live, true),
-                              on_disconnect={set_live(primary_live, false)}))
+primary_in = input.harbor("primary", port=9000, password=harbor_password, icy=true,
+                          on_connect=fun (_) -> set_live(primary_live, true),
+                          on_disconnect={set_live(primary_live, false)})
 
-guest   = buffer(buffer=2.0, max=10.0, fallible=true,
-                 input.harbor("guest",   port=9000, password=harbor_password, icy=true,
-                              on_connect=fun (_) -> set_live(guest_live, true),
-                              on_disconnect={set_live(guest_live, false)}))
+guest_in   = input.harbor("guest",   port=9000, password=harbor_password, icy=true,
+                          on_connect=fun (_) -> set_live(guest_live, true),
+                          on_disconnect={set_live(guest_live, false)})
+
+clock.assign_new(id="harbor", [primary_in, guest_in])
+
+primary = buffer(buffer=2.0, max=10.0, fallible=true, primary_in)
+guest   = buffer(buffer=2.0, max=10.0, fallible=true, guest_in)
 
 
 live = add(normalize=false, [primary, guest])
