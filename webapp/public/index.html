@@ -32,7 +32,7 @@
   <article class="center">
     <p><span id="live-badge" class="badge">OFF AIR</span></p>
     <p id="now-playing">Loading track info&hellip;</p>
-    <audio id="player" src="/stream.mp3" controls preload="auto"></audio>
+    <audio id="player" src="/stream.mp3" controls preload="none"></audio>
   </article>
 
   <article>
@@ -63,10 +63,14 @@ const $ = id => document.getElementById(id);
 const player = $("player"), arch = $("archive-player");
 
 // --- Live player: unique URL per load defeats caches so we join at the live edge ---
+// preload auto fixes firefox's mediasession not working
+// but preload none is needed on safari to not infinitly load the page.
+if (/firefox/i.test(navigator.userAgent)) player.preload = "auto";
 player.src = "/stream.mp3?_=" + Date.now();
+// Rejoin the live edge when we've fallen well behind (e.g. resumed after pause).
 player.addEventListener("playing", () => {
   const b = player.buffered, edge = b.length && b.end(b.length - 1);
-  if (edge && isFinite(edge) && edge - player.currentTime > 3) player.currentTime = edge;
+  if (edge && isFinite(edge) && edge - player.currentTime > 10) player.currentTime = edge - 3;
 });
 //player.play().catch(() => { /* autoplay blocked */ });
 
