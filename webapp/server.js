@@ -17,7 +17,7 @@ const crypto = require("crypto");
 
 const PORT = parseInt(process.env.PORT || "8010", 10);
 const REC_DIR = process.env.RECORDINGS_DIR || "/recordings";
-const ICECAST_URL = process.env.ICECAST_URL || "http://icecast:8000";
+const ICECAST_URL = process.env.ICECAST_URL || "http://icecast:80";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const RECORD_BITRATE = 192000; // must match %mp3(bitrate=192) in radio.liq
 

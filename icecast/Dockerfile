@@ -9,6 +9,6 @@ RUN chmod +x /entrypoint.sh
 
 USER icecast2
 
-EXPOSE 8000
+EXPOSE 80
 
 ENTRYPOINT ["/entrypoint.sh"]

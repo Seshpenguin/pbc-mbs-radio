@@ -4,7 +4,9 @@ services:
     container_name: icecast
     restart: unless-stopped
     ports:
-      - "8001:8000"
+      - "8001:80"
+    sysctls:
+      - net.ipv4.ip_unprivileged_port_start=80
     environment:
       - ICECAST_SOURCE_PASSWORD=${ICECAST_SOURCE_PASSWORD:?set ICECAST_SOURCE_PASSWORD in .env}
       - ICECAST_RELAY_PASSWORD=${ICECAST_RELAY_PASSWORD:?set ICECAST_RELAY_PASSWORD in .env}

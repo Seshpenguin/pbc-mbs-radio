@@ -112,13 +112,13 @@ if icecast_password == "" then
 end
 
 output.icecast(
-  %opus(bitrate=256, channels=2, signal="music", complexity=10),
+  %opus(bitrate=128, channels=2, signal="music", complexity=10),
   host="icecast",
-  port=8000,
+  port=80,
   password=icecast_password,
   mount="stream.ogg",
   name="MBS Radio",
-  description="You are listening to MBS Radio! A PBC and Global Affairs Pixl Digital Service.",
+  description="You are listening to MBS Radio! A PBC and Global Affairs Pixl Digital Service. Listen to previous broadcasts: https://radio.felineholdings.com/",
   genre="Various",
   radio
 )
@@ -126,11 +126,11 @@ output.icecast(
 output.icecast(
   %mp3(bitrate=320),
   host="icecast",
-  port=8000,
+  port=80,
   password=icecast_password,
   mount="stream.mp3",
   name="MBS Radio",
-  description="You are listening to MBS Radio! A PBC and Global Affairs Pixl Digital Service.",
+  description="You are listening to MBS Radio! A PBC and Global Affairs Pixl Digital Service. Listen to previous broadcasts: https://radio.felineholdings.com/",
   genre="Various",
   radio
 )

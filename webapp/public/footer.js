@@ -15,7 +15,7 @@ customElements.define("mbs-footer", class extends HTMLElement {
       stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px" aria-hidden="true"><line
       x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path
       d="M18 9a9 9 0 0 1-9 9"/></svg>
-    GNU AGPL 3.0 Licensed - <a href="https://github.com/Seshpenguin/pbc-mbs-radio">source code</a>.</small></p>
+    GNU AGPLv3 Licensed - <a href="https://github.com/Seshpenguin/pbc-mbs-radio">source code</a>.</small></p>
 </footer>`;
   }
 });
